@@ -50,7 +50,7 @@ public class Client extends Thread{
         @Override
         public void run() {
             System.out.println("REPLY: "+this.msg);
-            if(msg.getPIValue() != null){
+            if(msg.getMsgCode().equals("02")){
                 clientGUI.appendReplay(msg.getRequestId(), msg.getNum_iterations(), msg.getDeadline(), msg.getPIValue());
             }else{
                 clientGUI.appendReplay(msg.getRequestId(), msg.getNum_iterations(), msg.getDeadline(), "Rejected!");

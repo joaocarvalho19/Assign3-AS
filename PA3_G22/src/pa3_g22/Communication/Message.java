@@ -7,6 +7,7 @@ import java.io.Serializable;
 import java.net.*;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
 /**
  *
  * @author joaoc
@@ -21,7 +22,15 @@ public class Message implements Serializable{
     private String PIValue = null;
     private SocketAddress client = null;
     private String type = null;
-    private int total_iterations = 0;
+    private int total_iterations = 0;    
+    private String iteration = null;
+    
+    private List<Message> serverRequests;
+
+    public String getIteration() {
+        return iteration;
+    }
+
     // Number of requests being processed in each server
     private Map<Long, Integer> capacity_map = new HashMap<>();;
     
@@ -86,10 +95,26 @@ public class Message implements Serializable{
         this.capacity_map = capacity_map;
         this.requestId = requestId;
     }
-    public Message(String type, long serverId, int total_iterations) {
+    public Message(String type, long requestId, long serverId, int num_iterations) {
+        this.type = type;
+        this.requestId = requestId;
+        this.serverId = serverId;
+        this.num_iterations = num_iterations;
+    }
+    public Message(String type, long serverId, List<Message> serverRequests) {
         this.type = type;
         this.serverId = serverId;
-        this.total_iterations = total_iterations;
+        this.serverRequests = serverRequests;
+    }
+
+    public List<Message> getServerRequests() {
+        return serverRequests;
+    }
+    public Message(String type, long requestId, long serverId, String iteration) {
+        this.type = type;
+        this.requestId = requestId;
+        this.serverId = serverId;
+        this.iteration = iteration;
     }
     public Message(String type, long serverId, boolean isServer) {
         this.type = type;

@@ -15,9 +15,9 @@ import java.util.logging.Logger;
  */
 public class SClient implements Serializable{
     
-    private String host;
+    private String host = "localhost";
     
-    private int port;
+    private int port = 1000;
     
     private Socket socket;
     
@@ -30,8 +30,10 @@ public class SClient implements Serializable{
         this.port = portNumb;
     }
     
-    public SClient(Socket socket) {
+    public SClient(Socket socket, String host, int port) {
         this.socket = socket;
+        this.host = host;
+        this.port = port;
         //createSocket();
     }
     
@@ -69,15 +71,15 @@ public class SClient implements Serializable{
             obj = (Message)in.readObject();
         }
         catch(SocketException e) {
-            System.err.println(e+" LB failed");
-            socket.close();
+            System.err.println(e+" failed");
+            //end();
             /*try {
-                Thread.sleep(5000);
-            } catch (InterruptedException ex) {}
-            System.out.println(" Lets try again");
-            
-            socket = new Socket("localhost", 1000);
-            createSocket();*/
+                 Thread.sleep(10000);
+                } catch (InterruptedException ex) {}
+            socket = new Socket(this.host, this.port);
+            System.out.println(socket);
+            out = new ObjectOutputStream (this.socket.getOutputStream ());
+            in = new ObjectInputStream (this.socket.getInputStream ());*/
         }
         
         return obj;

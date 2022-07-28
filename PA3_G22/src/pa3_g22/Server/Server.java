@@ -31,8 +31,7 @@ public class Server extends Thread{
     private final long serverId;
     // Client GUI
     private final ServerGUI serverGUI;
-    // FIFO
-    private final MFIFO fifo;
+    
     private final ReentrantLock rl;
     
     // Number of simultaneous active threads
@@ -55,7 +54,6 @@ public class Server extends Thread{
         this.socketMonitor = socketMonitor;
         this.serverGUI = serverGUI;
         reqQueue = new ArrayList<>();
-        this.fifo = new MFIFO(3);
         rl = new ReentrantLock(true);
         
         // Threads to process the requests
@@ -74,9 +72,10 @@ public class Server extends Thread{
             while((msg = this.socketLB.readObject()) != null){
                 current_num_iterations += msg.getNum_iterations();
                 if(!queueIsFull() && current_num_iterations <= max_curr_iterations){
-                    socketMonitor.writeObject(new Message("SERVER_REQ_IN", serverId , current_num_iterations));
+                    socketMonitor.writeObject(new Message("SERVER_REQ_IN", msg.getRequestId(), serverId , msg.getNum_iterations()));
                     addRequestToQueue(msg);
                     serverGUI.appendRequest(msg.getRequestId(), msg.getNum_iterations(), msg.getDeadline(), msg.getClientId(), "Waiting...");
+                    socketMonitor.writeObject(new Message("ITERATION", msg.getRequestId() , serverId, "Pending..."));
                 }
                 else{
                     current_num_iterations -= msg.getNum_iterations();
@@ -105,7 +104,6 @@ public class Server extends Thread{
         } finally {
             rl.unlock();
         }
-        //fifo.out();
     }
     
     // Check if requests Queue is full 
@@ -144,20 +142,19 @@ public class Server extends Thread{
         
         @Override
         public void run() {
-            Message msg;
+            Message msg = null;
             while(true) {
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException ex) {
-                    Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-                }
+                /*try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ex) {}*/
                 msg = getNextRequest();
-                if(msg != null){
-                    System.out.println(id+" ID: "+msg.getDeadline());
-                    Message reply = processRequest(msg);
-                    socketLB.writeObject(reply);
-                    current_num_iterations -= msg.getNum_iterations();
-                    socketMonitor.writeObject(new Message("SERVER_REQ_OUT", serverId , current_num_iterations));
+
+                    if(msg != null){
+                        System.out.println(id+" ID: "+msg.getDeadline());
+                        Message reply = processRequest(msg);
+                        socketLB.writeObject(reply);
+                        current_num_iterations -= msg.getNum_iterations();
+                        socketMonitor.writeObject(new Message("SERVER_REQ_OUT", msg.getRequestId(), serverId , msg.getNum_iterations()));
                 }
             }
         }
@@ -167,13 +164,14 @@ public class Server extends Thread{
             for (int i = 0; i < msg.getNum_iterations(); i++) {
                 pi_value = pi_value + decimal_numbers.charAt(i);
                 serverGUI.setRequestState(msg.getRequestId(), String.valueOf(i+1));
+                socketMonitor.writeObject(new Message("ITERATION", msg.getRequestId() , serverId, String.valueOf(i+1)));
                 try {
                     Thread.sleep(5000);
                 } catch (InterruptedException ex) {}
-                
             }
             
-            serverGUI.setRequestState(msg.getRequestId(), "DONE");                
+            serverGUI.setRequestState(msg.getRequestId(), "DONE");     
+            socketMonitor.writeObject(new Message("ITERATION", msg.getRequestId() , serverId, "Processed"));
             Message reply = new Message("REPLY",msg.getClientId(), serverId, msg.getRequestId(), "02", msg.getNum_iterations(), pi_value, msg.getDeadline());
             return reply;
         }
@@ -191,10 +189,10 @@ public class Server extends Thread{
         }
         @Override
         public void run() {
-            Message heart_msg = new Message("HEARTBEAT", serverId, true);
+            Message heart_msg = new Message("HEARTBEAT_SERVER", serverId, true);
             while(true) {
                 try {
-                    Thread.sleep(2000);
+                    Thread.sleep(1000);
                     socketMonitor.writeObject(heart_msg);
                 } catch (InterruptedException ex) {
                     Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);

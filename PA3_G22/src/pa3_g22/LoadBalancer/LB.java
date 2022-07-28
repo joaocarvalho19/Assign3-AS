@@ -31,13 +31,17 @@ public class LB extends Thread{
     // Client GUI
     private final LBGUI lbGUI;
     
+    private String Monitorhost = "localhost";
+    
+    private int Monitorport = 2000;
+    
+    private int LBport = 0;
+    
     // SERVERS Map     
     private final HashMap<Long, SClient> serversMap;
     
     // CLIENTS Map     
     private final HashMap<Long, SClient> clientsMap;
-    
-    private final SClient[] serversList;
     
     private SClient socketMonitor;
     
@@ -45,29 +49,31 @@ public class LB extends Thread{
     private final Map<Long, Message> waitingRequests;
     
     
-    public LB(long Id, SServer server, SClient socketMonitor, LBGUI lbGUI) {
+    public LB(long Id, SServer server, SClient socketMonitor, LBGUI lbGUI , int LBport, String Monitorhost, int Monitorport) {
         this.lbId = Id;
         System.out.println("LB Id: "+Id);
         this.server = server;
         this.socketMonitor = socketMonitor;
-        new ClientHandler(socketMonitor).start();
+        new ClientHandler(socketMonitor, true).start();
         this.lbGUI = lbGUI;
         this.serversMap = new HashMap<>();
         this.clientsMap = new HashMap<>();
         this.waitingRequests = new HashMap<>();
-        serversList = new SClient[1];
-
+        this.Monitorhost = Monitorhost;
+        this.Monitorport = Monitorport;
+        
+        // Thread to send heartBeats to Monitor
+        new HeartBeatThread().start();
     }
     
     @Override
     public void run() {
-        Object msg;
         server.open();
         Socket socket;
         try{
             while((socket = server.accept()) != null)         
                try {
-                    new ClientHandler(new SClient(socket)).start();
+                    new ClientHandler(new SClient(socket, Monitorhost, Monitorport), false).start();
                 } catch (Exception ex) {
                     System.out.println(ex.toString());
                 }
@@ -101,28 +107,33 @@ public class LB extends Thread{
     }
     
     public void replyMsg(Message msg){
-        System.out.println("REPLY - " + msg.getPIValue());
-        
         clientsMap.get(msg.getClientId()).writeObject(msg);
-        
-        /*SClient c2;
-        Long c_id;
-        for (HashMap.Entry<Long, SClient>set : clientsMap.entrySet()) {
-            c2 = set.getValue();
-            c_id = set.getKey();
-            if(c_id == msg.getClientId()){
-                c2.writeObject(msg);
-                break;
-            }
+    }
+    
+    public void updateRole(Message msg){
+        System.out.println("NEW PORT!");
+        this.server = new SServer(1000);
+        /*try {
+            this.socketMonitor = new SClient(new Socket(Monitorhost, Monitorport), Monitorhost, Monitorport);
+            new ClientHandler(socketMonitor, true).start();
+        } catch (IOException ex) {
+            System.err.println(ex);
         }*/
+        this.run();
+    }
+    
+    // Server is down lets distribute the requests again
+    public void serverCrash(Message msg){
+        serversMap.remove(msg.getServerId());
+        msg.getServerRequests().forEach(m -> {
+            lbGUI.removeRequest(m.getRequestId());
+            newRequest(m);
+        });
     }
     
     public void serverAssignReq(Message msg){
         long right_server = getRightServer(msg.getCapacity_map());
-        System.out.println("Right Server: "+right_server);
-        msg.print();
         if (right_server == -1){
-            
             Message m = waitingRequests.get(msg.getRequestId());
             Message reply = new Message("REPLY",m.getClientId(), m.getRequestId(), "03", m.getNum_iterations(), m.getDeadline());
             clientsMap.get(m.getClientId()).writeObject(reply);
@@ -130,6 +141,7 @@ public class LB extends Thread{
         else{
             Message m = waitingRequests.get(msg.getRequestId());
             serversMap.get(right_server).writeObject(m);
+            lbGUI.setRequest(msg.getRequestId(), right_server);
         }
     }
     
@@ -139,7 +151,6 @@ public class LB extends Thread{
         int minCounter = -1;
         boolean isFirst = true;
         for (Map.Entry<Long, Integer>set : capacity_map.entrySet()) {
-            
             if(isFirst){
                 isFirst = false;
                 serverId = set.getKey();
@@ -157,10 +168,12 @@ public class LB extends Thread{
         private final SClient client;
         
         // Constructor
-        public ClientHandler(SClient client)
+        public ClientHandler(SClient client, boolean isMon)
         {
             this.client = client;
             client.createSocket();
+            if(isMon)
+                client.writeObject(new Message("NEW_LB", lbId));
         }
         
         @Override
@@ -170,17 +183,12 @@ public class LB extends Thread{
             try{
                 Message msg;
                 while ((msg = client.readObject()) != null) {
-                    System.out.printf(
-                        " Sent from the client: %s\n",
-                        msg.getRequestId());
                     // writing the received message from
                     // client
                     
-                    // if msg -> New REQ | New SERVER | HEATBEAT | 
                     switch(msg.getType()){
                         case "NEW_SERVER":
                             addServer(msg.getClientId(), client);
-                            serversList[0] = client;
                             //client.writeObject(msg);
                             break;
                             
@@ -200,6 +208,12 @@ public class LB extends Thread{
                             break; 
                         case "REPLY":
                             replyMsg(msg);
+                            break;
+                        case "SERVER_CRASHED":
+                            serverCrash(msg);
+                            break;
+                        case "LB_NEW_PRIMARY":
+                            updateRole(msg);
                             break;
                     }
                 }
@@ -224,10 +238,10 @@ public class LB extends Thread{
         }
         @Override
         public void run() {
-            Message heart_msg = new Message("HEARTBEAT", lbId, true);
+            Message heart_msg = new Message("HEARTBEAT_LB", lbId, true);
             while(true) {
                 try {
-                    Thread.sleep(2000);
+                    Thread.sleep(1000);
                     socketMonitor.writeObject(heart_msg);
                 } catch (InterruptedException ex) {
                     Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);

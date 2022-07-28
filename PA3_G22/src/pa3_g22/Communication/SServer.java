@@ -25,7 +25,6 @@ public class SServer  extends Thread{
     
     public void open() {
         try {
-            System.out.print("Start CCP Server! "+this.serverPort);
             this.listeningSocket = new ServerSocket(this.serverPort);
             //this.listeningSocket.setSoTimeout(10*1000);
         }

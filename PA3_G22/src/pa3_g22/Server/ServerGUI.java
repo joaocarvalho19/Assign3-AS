@@ -6,6 +6,7 @@ package pa3_g22.Server;
 
 import java.io.IOException;
 import java.net.Socket;
+import java.util.concurrent.locks.ReentrantLock;
 import javax.swing.table.DefaultTableModel;
 import pa3_g22.Client.Client;
 import pa3_g22.Communication.Message;
@@ -28,13 +29,16 @@ public class ServerGUI extends javax.swing.JFrame {
     
     private Server server;
     
+    private final ReentrantLock rl;
+    
     /**
      * Creates new form ClientGUI
      */
     public ServerGUI() {
         initComponents();
         serverId = ProcessHandle.current().pid();
-        System.out.println("Server Id: "+serverId);
+        title.setText("Server: "+serverId);
+        rl = new ReentrantLock(true);
     }
 
     public void appendRequest(long requestId, int num_iterations, int deadline, long clientID, String state){
@@ -43,13 +47,14 @@ public class ServerGUI extends javax.swing.JFrame {
     }
     
     public void setRequestState(long request, String state){
-        DefaultTableModel model;
-        model = (DefaultTableModel) requestsTable.getModel();
-        for (int i = 0; i < model.getRowCount(); i++) {
-            if (((Long)model.getValueAt(i, 0)).equals(request)) {
-                model.setValueAt(state, i, 4);
+            DefaultTableModel model;
+            model = (DefaultTableModel) requestsTable.getModel();
+            for (int i = 0; i < model.getRowCount(); i++) {
+                if (((Long)model.getValueAt(i, 0)).equals(request)) {
+                    model.setValueAt(state, i, 4);
+                }
             }
-        }
+
     }
     
     /**
@@ -75,7 +80,7 @@ public class ServerGUI extends javax.swing.JFrame {
         LBPort = new javax.swing.JTextField();
         jScrollPane3 = new javax.swing.JScrollPane();
         requestsTable = new javax.swing.JTable();
-        jLabel3 = new javax.swing.JLabel();
+        title = new javax.swing.JLabel();
         jSeparator2 = new javax.swing.JSeparator();
 
         jMenu1.setText("jMenu1");
@@ -170,16 +175,19 @@ public class ServerGUI extends javax.swing.JFrame {
         });
         jScrollPane3.setViewportView(requestsTable);
 
-        jLabel3.setForeground(new java.awt.Color(0, 0, 0));
-        jLabel3.setText("Server");
+        title.setForeground(new java.awt.Color(0, 0, 0));
+        title.setText("Server");
 
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel1Layout.createSequentialGroup()
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                     .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addContainerGap()
+                        .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE))
+                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, jPanel1Layout.createSequentialGroup()
                         .addGap(9, 9, 9)
                         .addComponent(jLabel4, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -188,9 +196,15 @@ public class ServerGUI extends javax.swing.JFrame {
                         .addComponent(jLabel5, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(LBPort, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 21, Short.MAX_VALUE)
                         .addComponent(clientStart))
+                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, jPanel1Layout.createSequentialGroup()
+                        .addGap(12, 12, 12)
+                        .addComponent(jSeparator1))
                     .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addContainerGap()
+                        .addComponent(jSeparator2))
+                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, jPanel1Layout.createSequentialGroup()
                         .addGap(9, 9, 9)
                         .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 71, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -199,28 +213,18 @@ public class ServerGUI extends javax.swing.JFrame {
                         .addComponent(jLabel2)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(MonitorPort, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(0, 0, Short.MAX_VALUE))
-                    .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addGap(12, 12, 12)
-                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(jPanel1Layout.createSequentialGroup()
-                                .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 375, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(0, 7, Short.MAX_VALUE))
-                            .addComponent(jSeparator1)))
-                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
-                        .addContainerGap()
-                        .addComponent(jSeparator2)))
+                        .addGap(0, 0, Short.MAX_VALUE)))
                 .addContainerGap())
             .addGroup(jPanel1Layout.createSequentialGroup()
-                .addGap(178, 178, 178)
-                .addComponent(jLabel3)
+                .addGap(179, 179, 179)
+                .addComponent(title)
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel1Layout.createSequentialGroup()
                 .addGap(15, 15, 15)
-                .addComponent(jLabel3)
+                .addComponent(title)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(jSeparator2, javax.swing.GroupLayout.PREFERRED_SIZE, 10, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -239,8 +243,8 @@ public class ServerGUI extends javax.swing.JFrame {
                 .addGap(16, 16, 16)
                 .addComponent(jSeparator1, javax.swing.GroupLayout.PREFERRED_SIZE, 10, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 203, Short.MAX_VALUE)
-                .addContainerGap())
+                .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 139, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -251,7 +255,9 @@ public class ServerGUI extends javax.swing.JFrame {
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+            .addGroup(layout.createSequentialGroup()
+                .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 0, Short.MAX_VALUE))
         );
 
         pack();
@@ -279,11 +285,11 @@ public class ServerGUI extends javax.swing.JFrame {
         String Monitorhost = MonitorHost.getText();
         int Monitorport = Integer.parseInt(MonitorPort.getText());
         try {
-            socketLB = new SClient(new Socket(LBhost, LBport));
+            socketLB = new SClient(new Socket(LBhost, LBport), LBhost, LBport);
             if(socketLB.createSocket())
                 socketLB.writeObject(new Message("NEW_SERVER",serverId));
             
-            socketMonitor = new SClient(new Socket(Monitorhost, Monitorport));
+            socketMonitor = new SClient(new Socket(Monitorhost, Monitorport), Monitorhost, Monitorport);
             if(socketMonitor.createSocket())
                 socketMonitor.writeObject(new Message("NEW_SERVER",serverId,true));
         } catch (IOException ex) {
@@ -340,7 +346,6 @@ public class ServerGUI extends javax.swing.JFrame {
     private javax.swing.JButton clientStart;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
-    private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
     private javax.swing.JMenu jMenu1;
@@ -349,5 +354,6 @@ public class ServerGUI extends javax.swing.JFrame {
     private javax.swing.JSeparator jSeparator1;
     private javax.swing.JSeparator jSeparator2;
     private javax.swing.JTable requestsTable;
+    private javax.swing.JLabel title;
     // End of variables declaration//GEN-END:variables
 }

@@ -7,6 +7,7 @@ package pa3_g22.Monitor;
 import pa3_g22.Client.*;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import pa3_g22.Communication.SClient;
@@ -24,10 +25,6 @@ public class MonitorGUI extends javax.swing.JFrame {
     // Client ID
     private final long monitorId;
     
-    private String LBhost = null;
-    
-    private int LBport = 0;
-    
     private int Monitorport = 0;
     
     private SClient socketLB;
@@ -37,7 +34,7 @@ public class MonitorGUI extends javax.swing.JFrame {
     
     private Monitor monitor;
     
-    private int increment;
+    private final ReentrantLock rl;
     
     /**
      * Creates new form ClientGUI
@@ -45,27 +42,83 @@ public class MonitorGUI extends javax.swing.JFrame {
     public MonitorGUI() {
         initComponents();
         this.monitorId = ProcessHandle.current().pid();
-        increment = 0;
+        //title.setText("Monitor: "+monitorId);
+        rl = new ReentrantLock(true);
     }
     
     public void appendServer(long serverId){
         DefaultTableModel model = (DefaultTableModel) serversTable.getModel();
-        model.addRow(new Object[]{serverId, "RUNNING",0});
+        model.addRow(new Object[]{serverId, "UP",0,0});
     }
     
-    public void setServerReqs(long serverId, int value){        
-        DefaultTableModel model;
-        model = (DefaultTableModel) serversTable.getModel();
-        for (int i = 0; i < model.getRowCount(); i++) {
-            if (((Long)model.getValueAt(i, 0)).equals(serverId)) {
-                model.setValueAt(value, i, 2);
+    public void appendLB(long lbId, String role){
+        DefaultTableModel model = (DefaultTableModel) lbTable.getModel();
+        model.addRow(new Object[]{lbId, "UP", role});
+    }
+    
+    public void appendReq(long reqId, long clientId, long serverId, int num_iter){
+        DefaultTableModel model = (DefaultTableModel) reqTable.getModel();
+        model.addRow(new Object[]{reqId, clientId, serverId, num_iter, "-"});
+    }
+    
+    public void setReqState(long reqId, long serverId, String value){
+            DefaultTableModel model;
+            model = (DefaultTableModel) reqTable.getModel();
+            for (int i = 0; i < model.getRowCount(); i++) {
+                if (((Long)model.getValueAt(i, 0)).equals(reqId)) {
+                    model.setValueAt(value, i, 4);
+                    model.setValueAt(serverId, i, 2);
+                }
             }
-        }
     }
     
-    public void appendReplay(long requestId, int num_iterations, int deadline, String pi_value){
-        DefaultTableModel model = (DefaultTableModel) repliesTable.getModel();
-        model.addRow(new Object[]{requestId, num_iterations, deadline, pi_value});
+    public void setServerState(long serverId, String value){
+            DefaultTableModel model;
+            model = (DefaultTableModel) serversTable.getModel();
+            for (int i = 0; i < model.getRowCount(); i++) {
+                if (((Long)model.getValueAt(i, 0)).equals(serverId)) {
+                    model.setValueAt(value, i, 1);
+                }
+            }
+    }
+    
+    public void setLBState(long lbId, String value){
+            DefaultTableModel model;
+            model = (DefaultTableModel) lbTable.getModel();
+            for (int i = 0; i < model.getRowCount(); i++) {
+                if (((Long)model.getValueAt(i, 0)).equals(lbId)) {
+                    model.setValueAt(value, i, 1);
+                }
+            }
+    }
+    
+    public void setLBRole(long lbId, String value){
+            DefaultTableModel model;
+            model = (DefaultTableModel) lbTable.getModel();
+            for (int i = 0; i < model.getRowCount(); i++) {
+                if (((Long)model.getValueAt(i, 0)).equals(lbId)) {
+                    model.setValueAt(value, i, 2);
+                }
+            }
+    }
+    
+    public void setServerReqs(long serverId, int value, boolean isIncr){     
+            DefaultTableModel model;
+            model = (DefaultTableModel) serversTable.getModel();
+            for (int i = 0; i < model.getRowCount(); i++) {
+                if (((Long)model.getValueAt(i, 0)).equals(serverId)) {
+                    int curr_iter = (Integer) model.getValueAt(i, 2);
+                    model.setValueAt(curr_iter+value, i, 2);
+                    if (isIncr) {
+                        model.setValueAt(curr_iter+value, i, 2);
+                        int curr_total_iter = (Integer) model.getValueAt(i, 3);
+                        model.setValueAt(curr_total_iter+value, i, 3);
+                    }
+                    else{
+                        model.setValueAt(curr_iter-value, i, 2);
+                    }
+                }
+            }
     }
 
     /**
@@ -89,13 +142,11 @@ public class MonitorGUI extends javax.swing.JFrame {
         jScrollPane1 = new javax.swing.JScrollPane();
         serversTable = new javax.swing.JTable();
         jScrollPane2 = new javax.swing.JScrollPane();
-        repliesTable = new javax.swing.JTable();
-        jLabel4 = new javax.swing.JLabel();
+        lbTable = new javax.swing.JTable();
+        jScrollPane3 = new javax.swing.JScrollPane();
+        reqTable = new javax.swing.JTable();
+        title = new javax.swing.JLabel();
         jSeparator3 = new javax.swing.JSeparator();
-        jLabel3 = new javax.swing.JLabel();
-        LBHost = new javax.swing.JTextField();
-        jLabel5 = new javax.swing.JLabel();
-        LBPort = new javax.swing.JTextField();
 
         jMenu1.setText("jMenu1");
 
@@ -146,14 +197,14 @@ public class MonitorGUI extends javax.swing.JFrame {
 
             },
             new String [] {
-                "Server ID", "State", "Total Nº Iter"
+                "Server ID", "State", "Curr Nº Iter", "Total Nº Iter"
             }
         ) {
             Class[] types = new Class [] {
-                java.lang.Long.class, java.lang.String.class, java.lang.Integer.class
+                java.lang.Long.class, java.lang.String.class, java.lang.Integer.class, java.lang.Integer.class
             };
             boolean[] canEdit = new boolean [] {
-                false, false, false
+                false, false, true, false
             };
 
             public Class getColumnClass(int columnIndex) {
@@ -168,20 +219,20 @@ public class MonitorGUI extends javax.swing.JFrame {
 
         tabbledPlane.addTab("Servers", jScrollPane1);
 
-        repliesTable.setForeground(new java.awt.Color(0, 0, 0));
-        repliesTable.setModel(new javax.swing.table.DefaultTableModel(
+        lbTable.setForeground(new java.awt.Color(0, 0, 0));
+        lbTable.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
 
             },
             new String [] {
-                "LB Id", "State"
+                "LB ID", "State", "Role"
             }
         ) {
             Class[] types = new Class [] {
-                java.lang.Long.class, java.lang.String.class
+                java.lang.Long.class, java.lang.String.class, java.lang.String.class
             };
             boolean[] canEdit = new boolean [] {
-                false, false
+                false, false, false
             };
 
             public Class getColumnClass(int columnIndex) {
@@ -192,38 +243,39 @@ public class MonitorGUI extends javax.swing.JFrame {
                 return canEdit [columnIndex];
             }
         });
-        jScrollPane2.setViewportView(repliesTable);
+        jScrollPane2.setViewportView(lbTable);
 
         tabbledPlane.addTab("LBs", jScrollPane2);
 
-        jLabel4.setForeground(new java.awt.Color(0, 0, 0));
-        jLabel4.setText("Monitor");
+        reqTable.setModel(new javax.swing.table.DefaultTableModel(
+            new Object [][] {
 
-        jLabel3.setBackground(new java.awt.Color(51, 51, 51));
-        jLabel3.setForeground(new java.awt.Color(0, 0, 0));
-        jLabel3.setText("LB Host:");
+            },
+            new String [] {
+                "Req ID", "Client ID", "Server ID", "Nº Iter", "Current Iter"
+            }
+        ) {
+            Class[] types = new Class [] {
+                java.lang.Long.class, java.lang.Long.class, java.lang.Long.class, java.lang.Integer.class, java.lang.Integer.class
+            };
+            boolean[] canEdit = new boolean [] {
+                false, false, false, true, true
+            };
 
-        LBHost.setBackground(new java.awt.Color(255, 255, 255));
-        LBHost.setForeground(new java.awt.Color(0, 0, 0));
-        LBHost.setText("localhost");
-        LBHost.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                LBHostActionPerformed(evt);
+            public Class getColumnClass(int columnIndex) {
+                return types [columnIndex];
+            }
+
+            public boolean isCellEditable(int rowIndex, int columnIndex) {
+                return canEdit [columnIndex];
             }
         });
+        jScrollPane3.setViewportView(reqTable);
 
-        jLabel5.setBackground(new java.awt.Color(51, 51, 51));
-        jLabel5.setForeground(new java.awt.Color(0, 0, 0));
-        jLabel5.setText("LB Port:");
+        tabbledPlane.addTab("REQs", jScrollPane3);
 
-        LBPort.setBackground(new java.awt.Color(255, 255, 255));
-        LBPort.setForeground(new java.awt.Color(0, 0, 0));
-        LBPort.setText("1000");
-        LBPort.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                LBPortActionPerformed(evt);
-            }
-        });
+        title.setForeground(new java.awt.Color(0, 0, 0));
+        title.setText("Monitor");
 
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
@@ -239,19 +291,12 @@ public class MonitorGUI extends javax.swing.JFrame {
                             .addComponent(jSeparator3, javax.swing.GroupLayout.Alignment.TRAILING)))
                     .addGroup(jPanel1Layout.createSequentialGroup()
                         .addGap(178, 178, 178)
-                        .addComponent(jLabel4, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addComponent(title, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE))
                     .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(jPanel1Layout.createSequentialGroup()
-                                .addGap(9, 9, 9)
-                                .addComponent(jLabel1)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(MonitorHost, javax.swing.GroupLayout.PREFERRED_SIZE, 72, javax.swing.GroupLayout.PREFERRED_SIZE))
-                            .addGroup(jPanel1Layout.createSequentialGroup()
-                                .addGap(15, 15, 15)
-                                .addComponent(jLabel3)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(LBHost, javax.swing.GroupLayout.PREFERRED_SIZE, 72, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                        .addGap(9, 9, 9)
+                        .addComponent(jLabel1)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(MonitorHost, javax.swing.GroupLayout.PREFERRED_SIZE, 72, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(18, 18, 18)
                         .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(jPanel1Layout.createSequentialGroup()
@@ -259,10 +304,7 @@ public class MonitorGUI extends javax.swing.JFrame {
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(MonitorPort, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE))
                             .addGroup(jPanel1Layout.createSequentialGroup()
-                                .addComponent(jLabel5)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(LBPort, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(18, 18, 18)
+                                .addGap(122, 122, 122)
                                 .addComponent(clientStart)))))
                 .addContainerGap())
         );
@@ -270,7 +312,7 @@ public class MonitorGUI extends javax.swing.JFrame {
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel1Layout.createSequentialGroup()
                 .addGap(9, 9, 9)
-                .addComponent(jLabel4)
+                .addComponent(title)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(jSeparator3, javax.swing.GroupLayout.PREFERRED_SIZE, 10, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -280,17 +322,11 @@ public class MonitorGUI extends javax.swing.JFrame {
                     .addComponent(jLabel2)
                     .addComponent(MonitorPort, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jLabel3)
-                    .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                        .addComponent(LBHost, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addComponent(jLabel5)
-                        .addComponent(LBPort, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addComponent(clientStart)))
+                .addComponent(clientStart)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(jSeparator1, javax.swing.GroupLayout.PREFERRED_SIZE, 10, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(tabbledPlane, javax.swing.GroupLayout.PREFERRED_SIZE, 183, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(tabbledPlane, javax.swing.GroupLayout.PREFERRED_SIZE, 170, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
@@ -319,19 +355,8 @@ public class MonitorGUI extends javax.swing.JFrame {
     }//GEN-LAST:event_MonitorPortActionPerformed
 
     private void clientStartActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clientStartActionPerformed
-        LBhost = LBHost.getText();
-        LBport = Integer.parseInt(LBPort.getText());
         Monitorport = Integer.parseInt(MonitorPort.getText());
         this.server = new SServer(Monitorport);
-        /*try {
-            //socketClient = new SClient(LBhost, LBport);
-            socketLB = new SClient(new Socket(LBhost, LBport));
-            socketLB.createSocket();
-            socketLB.writeObject(new Message("MONITOR", monitorId));
-            //socketClient.end();
-        } catch (IOException ex) {
-            System.err.println(ex);
-        }*/
 
         this.monitor = new Monitor(monitorId, this.server, socketLB, this);
         this.monitor.start();
@@ -339,14 +364,6 @@ public class MonitorGUI extends javax.swing.JFrame {
         clientStart.setEnabled(false);
 
     }//GEN-LAST:event_clientStartActionPerformed
-
-    private void LBHostActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_LBHostActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_LBHostActionPerformed
-
-    private void LBPortActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_LBPortActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_LBPortActionPerformed
 
     /**
      * @param args the command line arguments
@@ -385,24 +402,22 @@ public class MonitorGUI extends javax.swing.JFrame {
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
-    private javax.swing.JTextField LBHost;
-    private javax.swing.JTextField LBPort;
     private javax.swing.JTextField MonitorHost;
     private javax.swing.JTextField MonitorPort;
     private javax.swing.JButton clientStart;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
-    private javax.swing.JLabel jLabel3;
-    private javax.swing.JLabel jLabel4;
-    private javax.swing.JLabel jLabel5;
     private javax.swing.JMenu jMenu1;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
+    private javax.swing.JScrollPane jScrollPane3;
     private javax.swing.JSeparator jSeparator1;
     private javax.swing.JSeparator jSeparator3;
-    private javax.swing.JTable repliesTable;
+    private javax.swing.JTable lbTable;
+    private javax.swing.JTable reqTable;
     private javax.swing.JTable serversTable;
     private javax.swing.JTabbedPane tabbledPlane;
+    private javax.swing.JLabel title;
     // End of variables declaration//GEN-END:variables
 }

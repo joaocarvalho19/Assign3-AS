@@ -5,6 +5,7 @@
 package pa3_g22.LoadBalancer;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.concurrent.locks.ReentrantLock;
 import javax.swing.table.DefaultTableModel;
 import pa3_g22.Client.Client;
 import pa3_g22.Communication.Message;
@@ -25,6 +26,8 @@ public class LBGUI extends javax.swing.JFrame {
     // Communitation client - Monitor
     private SClient socketMonitor;
     
+    private final ReentrantLock rl;
+    
     private LB lb;
     /**
      * Creates new form LBGUI
@@ -34,11 +37,33 @@ public class LBGUI extends javax.swing.JFrame {
         
         LBId = ProcessHandle.current().pid();
         System.out.println("LB Id: "+LBId);
+        title.setText("Load Balancer: "+LBId);
+        rl = new ReentrantLock(true);
     }
 
     public void appendRequest(long requestId, int num_iterations, long clientId, long serverId){
         DefaultTableModel model = (DefaultTableModel) requestsTable.getModel();
         model.addRow(new Object[]{requestId, num_iterations, clientId, serverId});
+    }
+    
+    public void removeRequest(long requestId){
+        DefaultTableModel model;
+        model = (DefaultTableModel) requestsTable.getModel();
+        for (int i = 0; i < model.getRowCount(); i++) {
+            if (((Long)model.getValueAt(i, 0)).equals(requestId)) {
+                model.removeRow(i);
+            }
+        }
+    }
+    
+    public void setRequest(long requestId, long serverId){
+                DefaultTableModel model;
+                model = (DefaultTableModel) requestsTable.getModel();
+                for (int i = 0; i < model.getRowCount(); i++) {
+                    if (((Long)model.getValueAt(i, 0)).equals(requestId)) {
+                        model.setValueAt(serverId, i, 3);
+                    }
+                }
     }
     
     /**
@@ -65,7 +90,7 @@ public class LBGUI extends javax.swing.JFrame {
         jScrollPane3 = new javax.swing.JScrollPane();
         requestsTable = new javax.swing.JTable();
         jSeparator2 = new javax.swing.JSeparator();
-        jLabel3 = new javax.swing.JLabel();
+        title = new javax.swing.JLabel();
 
         jMenu1.setText("jMenu1");
 
@@ -143,7 +168,7 @@ public class LBGUI extends javax.swing.JFrame {
             }
         ) {
             Class[] types = new Class [] {
-                java.lang.String.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class
+                java.lang.Long.class, java.lang.Integer.class, java.lang.Long.class, java.lang.Long.class
             };
             boolean[] canEdit = new boolean [] {
                 false, false, false, false
@@ -159,16 +184,19 @@ public class LBGUI extends javax.swing.JFrame {
         });
         jScrollPane3.setViewportView(requestsTable);
 
-        jLabel3.setForeground(new java.awt.Color(0, 0, 0));
-        jLabel3.setText("Load Balancer");
+        title.setForeground(new java.awt.Color(0, 0, 0));
+        title.setText("Load Balancer");
 
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel1Layout.createSequentialGroup()
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                     .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addContainerGap()
+                        .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE))
+                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, jPanel1Layout.createSequentialGroup()
                         .addGap(9, 9, 9)
                         .addComponent(jLabel4, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -177,39 +205,36 @@ public class LBGUI extends javax.swing.JFrame {
                         .addComponent(jLabel5, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(LBPort, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 55, Short.MAX_VALUE)
                         .addComponent(lbStart))
-                    .addGroup(jPanel1Layout.createSequentialGroup()
+                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, jPanel1Layout.createSequentialGroup()
                         .addGap(12, 12, 12)
+                        .addComponent(jSeparator1))
+                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, jPanel1Layout.createSequentialGroup()
+                        .addContainerGap()
+                        .addComponent(jSeparator2))
+                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, jPanel1Layout.createSequentialGroup()
                         .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(jPanel1Layout.createSequentialGroup()
-                                .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 375, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(0, 7, Short.MAX_VALUE))
-                            .addComponent(jSeparator1)))
-                    .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addContainerGap()
-                        .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 71, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(MonitorHost, javax.swing.GroupLayout.PREFERRED_SIZE, 72, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(jLabel2)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(MonitorPort, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(0, 0, Short.MAX_VALUE))
-                    .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addContainerGap()
-                        .addComponent(jSeparator2)))
+                                .addContainerGap()
+                                .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 71, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(MonitorHost, javax.swing.GroupLayout.PREFERRED_SIZE, 72, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(jLabel2)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(MonitorPort, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addGroup(jPanel1Layout.createSequentialGroup()
+                                .addGap(157, 157, 157)
+                                .addComponent(title)))
+                        .addGap(0, 0, Short.MAX_VALUE)))
                 .addContainerGap())
-            .addGroup(jPanel1Layout.createSequentialGroup()
-                .addGap(157, 157, 157)
-                .addComponent(jLabel3)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel1Layout.createSequentialGroup()
                 .addGap(11, 11, 11)
-                .addComponent(jLabel3)
+                .addComponent(title)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(jSeparator2, javax.swing.GroupLayout.PREFERRED_SIZE, 10, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(3, 3, 3)
@@ -228,8 +253,8 @@ public class LBGUI extends javax.swing.JFrame {
                 .addGap(16, 16, 16)
                 .addComponent(jSeparator1, javax.swing.GroupLayout.PREFERRED_SIZE, 10, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 187, Short.MAX_VALUE)
-                .addContainerGap())
+                .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 135, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -240,7 +265,7 @@ public class LBGUI extends javax.swing.JFrame {
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(jPanel1, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+            .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
         );
 
         pack();
@@ -272,14 +297,13 @@ public class LBGUI extends javax.swing.JFrame {
         this.server = new SServer(LBport);
         
         try {
-            socketMonitor = new SClient(new Socket(Monitorhost, Monitorport));
-            /*if(socketMonitor.createSocket())
-                socketMonitor.writeObject(new Message("LB"));*/
+            socketMonitor = new SClient(new Socket(Monitorhost, Monitorport), Monitorhost, Monitorport);
+
         } catch (IOException ex) {
             System.err.println(ex);
         }
         
-        this.lb = new LB(LBId, server, socketMonitor, this);
+        this.lb = new LB(LBId, server, socketMonitor, this, LBport, Monitorhost, Monitorport);
         this.lb.start();
         lbStart.setEnabled(false);
     }//GEN-LAST:event_lbStartActionPerformed
@@ -329,7 +353,6 @@ public class LBGUI extends javax.swing.JFrame {
     private javax.swing.JTextField MonitorPort;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
-    private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
     private javax.swing.JMenu jMenu1;
@@ -339,5 +362,6 @@ public class LBGUI extends javax.swing.JFrame {
     private javax.swing.JSeparator jSeparator2;
     private javax.swing.JButton lbStart;
     private javax.swing.JTable requestsTable;
+    private javax.swing.JLabel title;
     // End of variables declaration//GEN-END:variables
 }
